@@ -25,7 +25,9 @@ Open http://localhost:3000. Make sure `.env.local` contains your Gemini key (see
 1. The demo story below should open. It is saved in your local database (`.data/newsren.sqlite`), so it stays available even after it leaves the feed. If you are on a different machine or a fresh database, pick any Technology story from MIT News instead and expect to click **Generate** (a real Gemini call).
 2. On the Following page, check that the demo topic **tariffs** finds matches (4 on 26 October 2026). If it finds none, use **Federal Reserve** instead.
 
-**Quota note.** The brief, the three explanations and the two questions below were generated earlier and are saved in the local cache, so replaying them makes no new request. If a button shows "Generating…" or the answer text differs, a real Gemini call is being made (the free tier has limits).
+**Pre-warm (recommended, before recording).** Open the demo story below and click **Generate AI brief** if the brief is not already shown, then click each of **Student**, **Educator** and **Professional** and press its **Generate … explanation** button once, then ask the two questions in the table. Each first click is a real Gemini request (a few seconds, free-tier quota); repeats of the same click are served from the local cache and make no request. If a button shows "Generating…" during the recording, a real request is being made. The saved results exist only in your local database.
+
+**Local vs live demo.** This script is written for the local app (http://localhost:3000), where results you pre-warmed stay saved. The live demo (https://newsren.onrender.com) is a free Render instance: it sleeps when idle (open it a minute before recording to wake it), and its database and cached AI results reset after a restart, so every AI click there is a new request unless you pre-warmed it in the same session. Its content comes from the same 15 feeds but is a different database, so the demo story below may not exist there; pick any current Technology story instead.
 
 ## Timed walkthrough
 
@@ -37,11 +39,11 @@ http://localhost:3000/story/at-mit-martha-minow-speaks-on-sustaining-democracy-b
 | 0:00 – 0:15 | Open http://localhost:3000. Point at the category tabs, click **Technology**, then type `federal reserve` in search and clear it. Open the **Sources** line to show 15 of 15 sources. | "Newsren reads 15 approved official and publisher feeds. These are headlines and short publisher excerpts, each linking to the original." |
 | 0:15 – 0:35 | Open the demo story URL. Show the publisher excerpt, the **Read the original at MIT News** link and the **Source and provenance** section. | "The excerpt is the publisher's own text. A link to the original is provenance, not independent verification." |
 | 0:35 – 1:00 | Show the brief: the AI label and time, the **Single source, not independently verified** notice, **What happened**, the **Reported / Interpretation** tags, **What remains uncertain**, then click a numbered citation. | "The brief was generated from the excerpt only. Every fact has a link, interpretation is labelled, and it is flagged single-source." |
-| 1:00 – 1:15 | Click **Student**, **Educator**, **Professional**. | "Same evidence, three levels. Anything not from the sources is labelled as general background." |
-| 1:15 – 1:40 | Ask: `What did Martha Minow warn about regarding the Enlightenment?` Then ask: `How much did MIT pay Martha Minow for the Compton Lecture?` | "A supported question gets a cited answer. This one is not in the excerpt, so it says the sources do not establish an answer." |
+| 1:00 – 1:15 | Click **Student**, **Educator**, **Professional** (each already generated). Point at **Limits of the evidence** and, if shown, the **General background** box. | "Same evidence, three levels. The cited text only says what the excerpt says; gaps and caveats are in 'Limits of the evidence', and general context is labelled as background." |
+| 1:15 – 1:40 | Ask: `What is this story about?` Then ask: `What were the audience's reactions and on what exact date was the lecture held?` | "On a story page, 'this story' means the story you're reading. The first answer is cited from the excerpt; the second is not in the excerpt, so it says the sources do not establish an answer." |
 | 1:40 – 2:00 | Click **Follow source** (then **Following**). Open **Following**, save the topic `tariffs`, click **Check for updates** (Initial coverage), click again (no new coverage, nothing repeated). | "This is a manual check, not monitoring. The first check sets a baseline in this browser; later checks show only new matching articles. Matching is keyword-based, and new coverage does not mean a new event." |
 
-Close by saying what it cannot do: it reads excerpts, not full articles, and you should open the original.
+Do not describe the check as monitoring, and do not say the output is verified. Close by saying what it cannot do: it reads excerpts, not full articles, and you should open the original.
 
 ## Optional: fixture demonstration of "New matching coverage" (fake data)
 

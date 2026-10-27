@@ -1,6 +1,14 @@
 # Newsren
 
-Newsren is a local prototype of a news reader that helps you discover stories from official and
+| | |
+| --- | --- |
+| **Live demo** | https://newsren.onrender.com (free Render instance: see "Live demo on free Render" below) |
+| **GitHub** | https://github.com/Nikhil-AI-Cloud/newsren |
+| **Submission summary** | [SUBMISSION.md](SUBMISSION.md) |
+| **System card** | [docs/system-card.md](docs/system-card.md) |
+| **Demo video** | pending recording |
+
+Newsren is a prototype of a news reader that helps you discover stories from official and
 original publishers, understand them at your level, ask questions that are answered only from
 retrieved publisher excerpts, and save topics you can check for new coverage **when you click**.
 
@@ -9,7 +17,7 @@ retrieved publisher excerpts, and save topics you can check for new coverage **w
 - **Investigate:** "Ask Newsren" answers from stored excerpts and says when the sources do not establish an answer.
 - **Follow:** follow a publisher feed, or save a topic or question and check it manually for new matching coverage.
 
-It is a course prototype, not a production service. It has no accounts, email, payments, background monitoring or deployment. See `docs/system-card.md` for what it can and cannot establish.
+It is a course prototype, not a production service. It has no accounts, email, payments or background monitoring, and the only deployment is a free demo instance. See `docs/system-card.md` for what it can and cannot establish. Newsren does not independently verify facts, does not read full articles, and does not guarantee that its output is correct.
 
 ## Prerequisites
 
@@ -23,12 +31,15 @@ It is a course prototype, not a production service. It has no accounts, email, p
 ## Install and run
 
 ```bash
+git clone https://github.com/Nikhil-AI-Cloud/newsren.git
 cd newsren
 npm install
 cp .env.example .env.local
 ```
 
-Open `.env.local` and, only if you want AI features, paste your key after `GEMINI_API_KEY=` (no quotes or spaces). Never commit this file; it is git-ignored.
+(From a downloaded ZIP, unzip it, `cd` into the folder and run the last two commands. `cp` copies the hidden file `.env.example`, which is included.)
+
+`.env.example` holds only empty placeholders. Open `.env.local` and, only if you want AI features, paste your own Gemini API key from Google AI Studio after `GEMINI_API_KEY=` (no quotes or spaces). The key is used on the server only and is never sent to the browser. Never commit `.env.local`; it is git-ignored. Without a key, everything else works and the AI buttons show "Gemini key not set".
 
 Run a production build (recommended for the demo):
 
@@ -54,6 +65,21 @@ The first page load fetches all 15 feeds (a few seconds) and creates `.data/news
 | `NEWSREN_CONTENT` | live | `sample` serves old development fixtures with a visible banner. Live failures never fall back to sample content. |
 | `NEWSREN_BLOCK_FEEDS` | none | Test switch: comma-separated feed ids forced to fail. |
 | `NEWSREN_AI_DEBUG` | off | `1` logs validation details that can quote model output. |
+
+## Actual model and settings (from the code)
+
+| Setting | Value |
+| --- | --- |
+| Provider / SDK | Google Gemini API through `@google/genai` |
+| Model | `gemini-3.5-flash-lite` unless `GEMINI_MODEL` is set (`server/ai/provider.ts`) |
+| Generation | JSON output with a response schema, temperature 0.2, thinking level LOW for `gemini-3*` models, one attempt (no SDK retries) |
+| Evidence per request | up to 7 stored articles, feed excerpts of at most 300 characters each |
+| Output caps | brief 3000, explanation 2500, answer 2000, update summary 2500 tokens |
+| Request timeout | 30 seconds |
+| Question / topic length | question 5 to 300 characters; saved topic 3 to 140 characters |
+| Prompt versions (cache keys) | brief v2, explanation v3, Ask v3, update summaries v2 (`server/ai/prompts.ts`) |
+| Newsren request limits | 6 per client per minute, 12 per minute overall, 200 per day (`NEWSREN_AI_*`) |
+| Feed refresh | at most every 600 seconds (`NEWSREN_REFRESH_SECONDS`), 10 newest items per feed per refresh |
 
 ## Architecture
 
@@ -103,6 +129,8 @@ Feed URLs are in `server/feeds/registry.ts`. Candidates that were rejected (empt
 - **Model:** `gemini-3.5-flash-lite` through the official `@google/genai` SDK. Google's pricing page lists a free tier ("Free of charge" input and output) for it and it is not a preview model. Billing and paid tools are not enabled.
 - **Retrieval:** a keyword search of stored articles (IDF-weighted stem overlap in titles and excerpts) selects up to 7 articles for the story or question, retrieved fresh for each question. The model sees only feed excerpts (at most 300 characters each) plus source IDs, titles, URLs, dates and retrieval times, and is told that they are excerpts, not full articles, that it has not browsed the web, and that several articles from one publisher are not independent verification.
 - **Output rules:** structured JSON, validated on the server. Citations must be supplied source IDs and are resolved to URLs by the server. Output is rejected for unknown IDs, uncited factual claims, URLs, numbers or quotations not in the excerpts, investment-advice phrasing, or cited claims that are not grounded in the cited excerpts. Optional general background is kept separate and uncited. A story with no usable excerpt is not sent to the model.
+- **Audience explanations:** Student, Educator and Professional are generated separately, on request, and cached separately. Each has short cited paragraphs that may contain only what the cited excerpt says, plus an uncited **Limits of the evidence** note (what the excerpt does not show and what to verify) and optional general background. Keeping caveats out of the cited paragraphs fixed an earlier false rejection in which verify-advice diluted the grounding check. Educator also gets up to three discussion questions.
+- **Ask Newsren:** on a story page the prompt names the current story, so "explain me about it", "this story" or "summarize" refer to it and are answered from its title and excerpt (a short excerpt gives a short answer that lists what is missing). Questions the excerpts cannot answer abstain with an explanation.
 - **Labels:** "AI-generated from publisher excerpts" with generation time; "Single source, not independently verified"; "Limited brief"; "General background, not from the sources". These checks reduce but do not eliminate errors and do not prove accuracy.
 - **Free-quota controls:** AI runs only after a click; results are cached in SQLite by task, model, prompt version, evidence hash, audience and question; identical simultaneous requests share one call; one attempt per click (no retries); bounded inputs, output and 30 s timeout; request limits; same-origin requests only.
 
@@ -133,11 +161,28 @@ The free tier has per-minute and per-day request limits set by Google per projec
 - **"New matching coverage" is not a "new event".** It means Newsren stored a matching article it had not shown you before.
 - Only the 10 newest items per feed are ingested per refresh, so a very busy feed can lose items between refreshes.
 - Validation catches obvious unsupported additions; it cannot prove a paraphrase is accurate. Output should be checked against the original article.
+- **Free API quota.** AI features run on a free-tier quota that can run out; Newsren then shows an error and generates nothing (cached results still work). Free-tier content may be used by Google to improve its products.
+- **Browser-local topics.** Saved topics, followed sources and check baselines live only in one browser's `localStorage` (cleared with site data, not shared across devices).
+- **Free Render demo.** It sleeps when idle and loses its database on restart (see "Hosting").
 - Not verified here: the SEC story pages return HTTP 403 to automated requests, so SEC originals were not opened in a browser.
 
-## Hosting requirement: SQLite needs a persistent disk
+## Hosting: SQLite needs a persistent disk
 
-Articles, feed status and the AI cache live in a **local SQLite file** (`.data/newsren.sqlite` plus `-wal` and `-shm`). Run it on a machine or container with a **persistent, writable disk**, with a single server instance per database file. Do **not** assume it persists on ephemeral or serverless hosts (for example Vercel functions or AWS Lambda): the file would be lost on redeploy or scale-to-zero, and instances would not share it. For those hosts, replace `server/db.ts` and `server/store.ts` (all queries go through them) with a hosted database. No deployment has been done. Back up by copying the three files while the server is stopped.
+Articles, feed status and the AI cache live in a **local SQLite file** (`.data/newsren.sqlite` plus `-wal` and `-shm`).
+
+- **Locally** the file persists across restarts of the server (checked: a known story URL still opens after a restart).
+- **On a host** run it on a machine or container with a **persistent, writable disk** and a single server instance per database file. Do **not** assume the file persists on ephemeral or serverless hosts: it would be lost on redeploy or scale-to-zero, and instances would not share it. To use such hosts properly, replace `server/db.ts` and `server/store.ts` (all queries go through them) with a hosted database.
+- Back up locally by copying the three files while the server is stopped.
+
+### Live demo on free Render
+
+The live demo at https://newsren.onrender.com runs on a free Render instance. Expect these effects:
+
+- **It sleeps when idle.** The first request after a quiet period has to wake it (one check took about 37 seconds); later requests are fast.
+- **Its filesystem does not persist.** After a restart, spin-down or redeploy, the database starts empty: stored articles are re-collected from the feeds on the first page load, saved story URLs from before the reset stop working, and cached AI outputs are gone, so clicking Generate or Ask makes a new request to the free Gemini quota.
+- **Some feeds may be unavailable from the host.** At one check 13 of 15 sources were reachable, and the page lists any that are not.
+- Saved topics and followed sources are stored in your own browser, so they survive a server reset, but their saved baselines can then refer to stories that are no longer stored.
+- The AI buttons are enabled there (the page does not show "Gemini key not set"). I did not run AI requests on the live site, so its AI behaviour is not verified.
 
 ## Tests and checks
 
@@ -145,7 +190,7 @@ Articles, feed status and the AI cache live in a **local SQLite file** (`.data/n
 npm run typecheck        # tsc --noEmit
 npm run lint
 npm run build
-npm test                 # four offline suites, no network, no API key, no quota (64 checks)
+npm test                 # four offline suites, no network, no API key, no quota (68 checks)
 npm run verify:feeds     # fetches and parses all 15 feeds (network)
 npm run test:ai-real     # real Gemini calls: uses free quota; needs GEMINI_API_KEY
 ```
@@ -176,4 +221,4 @@ Open http://localhost:3200/following. In a second terminal, add fixture updates 
 
 ## Submission materials
 
-`docs/system-card.md`, `docs/demo-script.md`, `docs/submission-checklist.md`. Do not include `.env.local`, `.data/`, `node_modules/` or `.next/`.
+`SUBMISSION.md`, `docs/system-card.md`, `docs/demo-script.md`, `docs/submission-checklist.md`. Do not include `.env.local`, `.data/`, `node_modules/` or `.next/`.

@@ -1,6 +1,6 @@
 # Newsren system card
 
-Status: course prototype, local only, not deployed. Last verified: 26 October 2026 (see "Test results").
+Status: course prototype. Runs locally and as a free demo on Render (https://newsren.onrender.com). Source: https://github.com/Nikhil-AI-Cloud/newsren. Last verified: 26–27 October 2026 (see "Validation and actual test results").
 
 ## Purpose and intended users
 
@@ -12,6 +12,7 @@ It is **not** for investment decisions, legal, medical or safety decisions, or a
 
 - **Provider and model:** Google Gemini API, model `gemini-3.5-flash-lite` (configurable with `GEMINI_MODEL`), through the official `@google/genai` SDK. Chosen because Google's pricing page lists a free tier ("Free of charge" input and output) for it, and it is not a preview model. No billing, paid search or other paid tool is enabled, and Newsren never switches models by itself.
 - **Where it runs:** server side only. The API key is read from `.env.local` in one server file and is not present in browser code or build output.
+- **Settings (from the code):** JSON output with a response schema, temperature 0.2, thinking level LOW for `gemini-3*` models, output caps of 2000–3000 tokens, 30-second timeout, one attempt per click. Prompt versions: brief v2, explanation v3, Ask v3, update summaries v2 (changing a version invalidates that task's cached results).
 - **Calls:** only after a user click, never during page rendering or build. One attempt per click, a 30-second timeout, bounded output, per-client / per-minute / per-day limits, and a SQLite cache of successful results.
 
 ## Source data and evidence flow
@@ -21,6 +22,12 @@ It is **not** for investment decisions, legal, medical or safety decisions, or a
 3. **Retrieval.** For a story or question, a keyword search over stored titles and excerpts picks up to 7 articles. The model receives only feed excerpts (at most 300 characters each) with source IDs, titles, URLs, dates and retrieval times, inside delimited blocks marked as untrusted data.
 4. **Generation.** The model returns structured JSON. The server validates it, resolves citation IDs to stored URLs, and shows it labelled "AI-generated from publisher excerpts" with the generation time.
 5. **Display.** Each claim links to its source. Single-source, limited-evidence and background content are labelled.
+
+**Audience explanations (Student / Educator / Professional).** Generated separately on request from the same evidence and cached separately. Cited paragraphs may contain only what the cited excerpt says. What the excerpt does not show, and what a reader should verify, goes in an uncited "Limits of the evidence" note; general context goes in a labelled, uncited background note. (An earlier version asked the model to add verify-advice to the paragraphs, which the grounding check wrongly rejected; moving it to the limitations field fixed that.)
+
+**Ask Newsren.** Retrieval runs fresh for each question over all stored articles. On a story page the current story is passed to the model as context, so "explain me about it", "this story" or "summarize" refer to it and are answered from its title and excerpt; a short excerpt gives a short answer that lists what is missing. A single publisher limits verification but does not stop its own report being summarized. Questions the excerpts cannot answer abstain.
+
+**Manual topic checks.** A saved topic can be checked by clicking: Newsren refreshes the feeds (at most every 10 minutes) and keyword-searches the stored articles. The first check is "Initial coverage" and saves a baseline in the browser; later checks show only "New matching coverage". Nothing is monitored automatically. There is no scheduler, email or login.
 
 ## What the system can and cannot establish
 
@@ -46,15 +53,16 @@ It is **not** for investment decisions, legal, medical or safety decisions, or a
 | Check | Result |
 | --- | --- |
 | `npm run typecheck`, `npm run lint`, `npm run build` | all pass |
-| `npm test` (offline, fake provider and fixture data) | 64 checks pass: 29 AI validation / provider-error / limit / cache / de-duplication, 24 evidence-quality and update-task, 8 topic baseline and failure handling, 3 data retention |
+| `npm test` (offline, fake provider and fixture data) | 68 checks pass: 29 AI validation / provider-error / limit / cache / de-duplication, 28 evidence-quality, explanation-limitations and update-task, 8 topic baseline and failure handling, 3 data retention |
 | `npm run verify:feeds` (live) | all 15 feeds fetched and parsed |
 | Original links (live) | the newest article of 14 of 15 feeds returned HTTP 200; the SEC returned 403 to an automated request, so SEC links were not opened |
-| Real Gemini calls | a sourced brief, Student, Educator and Professional explanations, a supported question (answered with a citation), an unsupported question (declined: "available sources do not establish an answer"), a limited-evidence brief and an "Explain these updates" request all worked; cached repeats made no provider call |
+| Real Gemini calls (local) | after the explanation and Ask fixes: Student, Educator and Professional explanations and a supported and an unsupported question on a one-sentence-excerpt story (CSX / Supply Chain Dive) all worked (5 calls); "explain me about it" and "What is this story about?" on the MIT story were answered with citations (3 calls). Earlier: a sourced brief, Student, Educator and Professional explanations, a supported question (answered with a citation), an unsupported question (declined: "available sources do not establish an answer"), a limited-evidence brief and an "Explain these updates" request all worked; cached repeats made no provider call |
 | Real failures seen | a deliberately invalid key was rejected by Google and shown as "The Gemini API key was rejected"; during development the validator rejected several real model outputs (for example an Educator explanation with a numeric background note, since changed to drop only that note) |
 | Browser walkthrough on real feeds | home, filters, search, direct story URL, follow/unfollow, saved topic with initial and repeat check (no duplicates), reload, server restart, mobile width (375 px, no horizontal overflow), loading, error, single-source, limited-evidence and no-excerpt states |
+| Live demo (Render) | reachable (HTTP 200; the first request took about 37 s while the free instance woke); 13 of 15 sources reachable at one check; story pages load; an unknown story URL returns 404; AI buttons are enabled. **AI requests on the live site were not exercised.** |
 | Simulated (not real) | 429 quota, timeouts, 5xx, malformed output and feed failure (`NEWSREN_BLOCK_FEEDS`) were simulated with fakes or a test switch |
 
-**Not verified:** quality at scale or across many stories (a handful were reviewed); accuracy of paraphrases beyond the automated checks and a few manual reads; SEC original pages in a browser; any hosted deployment; behaviour on Node 22.
+**Not verified:** AI output on the deployed site; behaviour after a Render restart (expected from Render's free-tier terms, not tested); quality at scale or across many stories (a handful were reviewed); accuracy of paraphrases beyond the automated checks and a few manual reads; SEC original pages in a browser; behaviour on Node 22.
 
 ## Privacy, storage and data handling
 
@@ -62,7 +70,7 @@ It is **not** for investment decisions, legal, medical or safety decisions, or a
 - **Browser:** saved topics, followed sources, baselines and check results are stored only in your browser's `localStorage`. Clearing site data deletes them; they do not sync.
 - **Sent to Google:** for each AI request, the question or topic text, the story or topic context and up to 7 publisher excerpts. On the free tier Google may use submitted content to improve its products, so do not enter private information into questions or saved topics.
 - **Secrets:** `GEMINI_API_KEY` lives only in `.env.local` (git-ignored). Logs record error categories, not prompts or keys.
-- **Retention:** nothing is pruned automatically.
+- **Retention:** nothing is pruned automatically. Locally the SQLite file persists across restarts. On the free Render demo the filesystem is not persistent: after a restart or redeploy the database starts empty and cached AI outputs are lost.
 
 ## Limitations and human review
 
@@ -71,4 +79,6 @@ It is **not** for investment decisions, legal, medical or safety decisions, or a
 - The model may phrase things more confidently than an excerpt warrants; the "Interpretation" and "Reported" tags and the "what remains uncertain" list reduce but do not remove this.
 - No human editorial review happens inside the product. The project plan calls for human review before publishing finance content; this prototype publishes nothing and is meant to be read by a person who checks sources.
 - The prototype has no abuse protection beyond basic request limits and same-origin checks, and is not hardened for public deployment.
-- The SQLite store needs a persistent disk; it must not be assumed to persist on serverless hosting.
+- The SQLite store needs a persistent disk; it must not be assumed to persist on serverless or free ephemeral hosting. The free Render demo sleeps when idle (slow first request) and resets its data on restart.
+- Free-tier API quota can run out; Newsren then shows an error and generates nothing.
+- Newsren does not independently verify facts, does not read full articles, does not monitor topics automatically, and does not guarantee that any output is correct.
