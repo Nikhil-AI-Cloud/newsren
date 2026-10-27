@@ -187,7 +187,7 @@ The live demo at https://newsren.onrender.com runs on a free Render instance. Ex
 ## Tests and checks
 
 ```bash
-npm run typecheck        # tsc --noEmit
+npm run typecheck        # next typegen, then tsc --noEmit
 npm run lint
 npm run build
 npm test                 # four offline suites, no network, no API key, no quota (68 checks)

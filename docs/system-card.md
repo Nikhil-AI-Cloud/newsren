@@ -11,7 +11,7 @@ It is **not** for investment decisions, legal, medical or safety decisions, or a
 ## Model and provider
 
 - **Provider and model:** Google Gemini API, model `gemini-3.5-flash-lite` (configurable with `GEMINI_MODEL`), through the official `@google/genai` SDK. Chosen because Google's pricing page lists a free tier ("Free of charge" input and output) for it, and it is not a preview model. No billing, paid search or other paid tool is enabled, and Newsren never switches models by itself.
-- **Where it runs:** server side only. The API key is read from `.env.local` in one server file and is not present in browser code or build output.
+- **Where it runs:** server side only. The API key is read from the server's environment variables (locally from `.env.local`) in one server file and is not present in browser code or build output.
 - **Settings (from the code):** JSON output with a response schema, temperature 0.2, thinking level LOW for `gemini-3*` models, output caps of 2000–3000 tokens, 30-second timeout, one attempt per click. Prompt versions: brief v2, explanation v3, Ask v3, update summaries v2 (changing a version invalidates that task's cached results).
 - **Calls:** only after a user click, never during page rendering or build. One attempt per click, a 30-second timeout, bounded output, per-client / per-minute / per-day limits, and a SQLite cache of successful results.
 
@@ -69,7 +69,7 @@ It is **not** for investment decisions, legal, medical or safety decisions, or a
 - **Server:** stores public feed data (titles, excerpts, URLs, dates), feed status and cached AI outputs in a local SQLite file. It stores no accounts, names or reader content. For rate limiting it stores a hash of the caller's address (or "local") with a timestamp for 24 hours. Question text is cached with the answer.
 - **Browser:** saved topics, followed sources, baselines and check results are stored only in your browser's `localStorage`. Clearing site data deletes them; they do not sync.
 - **Sent to Google:** for each AI request, the question or topic text, the story or topic context and up to 7 publisher excerpts. On the free tier Google may use submitted content to improve its products, so do not enter private information into questions or saved topics.
-- **Secrets:** `GEMINI_API_KEY` lives only in `.env.local` (git-ignored). Logs record error categories, not prompts or keys.
+- **Secrets:** `GEMINI_API_KEY` lives only in the server's environment (locally `.env.local`, which is git-ignored); it is not in the repository. Logs record error categories, not prompts or keys.
 - **Retention:** nothing is pruned automatically. Locally the SQLite file persists across restarts. On the free Render demo the filesystem is not persistent: after a restart or redeploy the database starts empty and cached AI outputs are lost.
 
 ## Limitations and human review
